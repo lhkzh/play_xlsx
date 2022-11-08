@@ -4,8 +4,7 @@
 **读取**
 ```
 const PlayXlsx=require("play_xlsx").PlayXlsx;
-var xls = new PlayXlsx();
-xls.loadFile("test1.xlsx").then(()=>{
+PlayXlsx.loadByFile("test1.xlsx").then(xls=>{
     console.log(xls.sheetsNum, xls.sheetsNames, xls.isSheetVisible(0))
     var sheet = xls.getSheetByIndex(0);
     console.log(sheet.dimension(), JSON.stringify(sheet.readAll()))
@@ -14,7 +13,7 @@ xls.loadFile("test1.xlsx").then(()=>{
 **新建写入**
 ```
 const PlayXlsx=require("play_xlsx").PlayXlsx;
-var xls = await PlayXlsx.generateNew([{
+var sheetsData = [{
     name:"t1",
     data:[
         ["id","name","age","flag"],
@@ -30,7 +29,15 @@ var xls = await PlayXlsx.generateNew([{
         [204,383],
         [205,399,"tmp_mark"],
     ]
-} ]);
-xls.writeFile("test2.xlsx");
+} ];
+PlayXlsx.generateNew(sheetsData).then(xls=>{
+  xls.writeFile("test2.xlsx")
+});
+```
+
 根据自己环境（非fibjs）需要安装依赖jszip    
-参考 https://github.com/lodengo/xlsx
+源码实现参考 https://github.com/lodengo/xlsx   
+
+**和sheetjs区别**
+功能少    
+提升require的速度
