@@ -2,10 +2,13 @@ import * as fs from "fs";
 import { parseLtxSax } from "./ltx_sax";
 import { Xlsx_base } from "./Xlsx_base";
 export class Xlsx_fibjs extends Xlsx_base{
-    protected async _loadData(data:Buffer) {
+    protected _loadData(data:Buffer) {
         var self = this;
         var zfile = require("zip").open(data, "r");
         zfile.namelist().forEach(f=>{
+            if(f.endsWith("/")){
+                return;
+            }
             var strf = zfile.read(f).toString();
             try{
                 self._fe[f] = parseLtxSax(strf);
@@ -27,11 +30,11 @@ export class Xlsx_fibjs extends Xlsx_base{
         }
         return this;
     }
-    public async writeFile(filename:string){
-        var data = await this.data();
+    public writeFile(filename:string){
+        var data = this.data();
         fs.writeFileSync(filename, data);
     }
-    public async data() {
+    public data() {
         var ms = new (require("io").MemoryStream)();
         var zfile = require("zip").open(ms, "w");
         var self = this;
@@ -42,15 +45,15 @@ export class Xlsx_fibjs extends Xlsx_base{
         ms.rewind();
         return ms.readAll();
     }
-    public static async generateNew(sheets: Array<{ name: string, data: any[] }>):Promise<Xlsx_base>{
+    public static generateNew(sheets: Array<{ name: string, data: any[] }>):Xlsx_base{
         var xls = new Xlsx_fibjs();
-        await xls._loadData(fs.readFileSync(__dirname+"/../tpl.xlsx"));
-        return await xls.writeAll(sheets);
+        xls._loadData(fs.readFileSync(__dirname+"/../tpl.xlsx"));
+        return xls.writeAll(sheets);
     } 
-    public static async loadByFile(fileName:string):Promise<Xlsx_base>{
-        return await this.loadByData(fs.readFileSync(fileName));
+    public static loadByFile(fileName:string):Xlsx_base{
+        return this.loadByData(fs.readFileSync(fileName));
     }
-    public static async loadByData(data:Buffer):Promise<Xlsx_base>{
-        return await (new Xlsx_fibjs())._loadData(data);
+    public static loadByData(data:Buffer):Xlsx_base{
+        return (new Xlsx_fibjs())._loadData(data);
     } 
 }

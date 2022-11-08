@@ -3,15 +3,15 @@ import LtxElement from "./ltx_Element";
 export abstract class Xlsx_base {
   constructor(protected _fe: any = {}, protected _ss: any = {}) {
   }
-  protected async _loadData(data: Buffer): Promise<Xlsx_base> {
+  protected _loadData(data: Buffer): Xlsx_base {
     return this;
   }
-  protected async _loadFile(filename: string): Promise<Xlsx_base> {
+  protected _loadFile(filename: string): Xlsx_base {
     return this;
   }
-  public async writeFile(filename: string) {
+  public writeFile(filename: string) {
   }
-  public async data(): Promise<Buffer> {
+  public data(): Buffer {
     return null;
   }
   public getDownloadHeaders(filename: string) {
@@ -91,19 +91,39 @@ export abstract class Xlsx_base {
       this.setSheetName(i, sheets[i].name);
       var xss = this.getSheetByIndex(i);
       var xdata = sheets[i].data;
+      var max_row = xdata.length;
+      var max_col = 1;
       for (var j = 0; j < xdata.length; j++) {
         xss.write("A" + (j + 1), xdata[j]);
+        if(Array.isArray(xdata[j])){
+          max_col = Math.max(xdata[j].length, max_col);
+        }
       }
+      var ref = "A1:"+(Xlsx_base.dsum26(max_col))+max_row;
+      xss._writeDimension(ref);
     }
     return this;
   }
-  public static async generateNew(sheets: Array<{ name: string, data: any[] }>): Promise<Xlsx_base> {
+  private static dsum26(num:number){
+    let res = [];
+    // 短除法，注意余数为0时，将商减1，对应字母'z'
+    while (num > 26) {
+      res.push(this.D26[num % 26]);
+      num = Math.floor(num / 26);
+    }
+    // 不要忘了末位
+    res.push(this.D26[num]);
+    // 倒置
+    return res.reverse().join('');
+  }
+  private static D26 = 'ZABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  public static generateNew(sheets: Array<{ name: string, data: any[] }>): Xlsx_base {
     return null;
   }
-  public static async loadByFile(fileName: string): Promise<Xlsx_base> {
+  public static loadByFile(fileName: string): Xlsx_base {
     return null;
   }
-  public static async loadByData(data: Buffer): Promise<Xlsx_base> {
+  public static loadByData(data: Buffer): Xlsx_base {
     return null;
   }
 }
@@ -124,12 +144,27 @@ export class Xlsx_sheet {
     return <any[]>this.read(this.dimension());
   }
   public dimension(): string {
-    for (var i = 0; i <= this._el.children.length; i++) {
-      if ('dimension' == this._el.children[i].name) {
-        return this._el.children[i].attr('ref');
+    var em = this._get_dimension();
+    var ref:string;
+    if(em!=null){
+      var t = em.attr("ref");
+      if(t){
+        ref = t.toString();
       }
     }
-    return ':';
+    return ref||":";
+  }
+  _writeDimension(ref: string) {
+    var em = this._get_dimension();
+    em && em.attr("ref", ref);
+  }
+  private _get_dimension():LtxElement{
+    for (var i = 0; i <= this._el.children.length; i++) {
+      if ('dimension' == this._el.children[i].name) {
+        return this._el.children[i];
+      }
+    }
+    return null;
   }
   _readRange(range) {
     range = decode_range(range);

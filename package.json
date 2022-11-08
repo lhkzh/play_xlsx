@@ -1,17 +1,12 @@
 {
   "name": "play_xlsx",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": false,
   "main": "lib/index.js",
   "module": "lib/index.js",
   "homepage": "https://github.com/lhkzh/play_xlsx",
-  "keywords": ["xlsx","lite-xlsx","nodejs","fibjs"],
+  "keywords": ["xlsx","sheet","lite","fast","nodejs","fibjs"],
   "license": "GNU",
-  "devDependencies": {
-    "jszip":"*"
-  },
-  "scripts": {
-  },
   "files": [
     "lib/",
     "tpl.xlsx",

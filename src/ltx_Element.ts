@@ -303,7 +303,7 @@ export default class LtxElement {
     return this.getText();
   }
 
-  attr(attr, val) {
+  attr(attr, val?) {
     if (typeof val !== "undefined" || val === null) {
       if (!this.attrs) {
         this.attrs = {};
