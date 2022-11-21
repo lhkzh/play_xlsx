@@ -35,7 +35,7 @@ var sheet = xls.getSheetByIndex(0);
 console.log(sheet.dimension(), JSON.stringify(sheet.readAll()))
 ```
 
-根据自己环境（非fibjs）
+根据自己环境（非fibjs）    
 xlsx改自 https://github.com/lodengo/xlsx   
 zip原作者  https://github.com/Teal/TUtils/blob/master/src/zipFile.ts 
 
