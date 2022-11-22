@@ -22,10 +22,14 @@ var xlsxData = [{
 PlayXlsx.generateNew(xlsxData).writeFile(fileName);
 
 var xls = PlayXlsx.loadByFile(fileName);
-
-console.log(xls.sheetNum==xlsxData.length);
+console.log(JSON.stringify(xls.sheetNames)==JSON.stringify(xlsxData.map(e=>e.name)));
 console.log(JSON.stringify(xls.getSheetByIndex(0).readAll())==JSON.stringify(xlsxData[0].data));
 console.log(JSON.stringify(xls.getSheetByIndex(1).readAll())==JSON.stringify(xlsxData[1].data));
+
+PlayXlsx.generateFast(xlsxData[0].data, "t3").writeFile(fileName);
+var xls = PlayXlsx.loadByFile(fileName);
+console.log(JSON.stringify(xls.sheetNames)=='["t3"]');
+console.log(JSON.stringify(xls.getSheetByIndex(0).readAll())==JSON.stringify(xlsxData[0].data));
 
 
 

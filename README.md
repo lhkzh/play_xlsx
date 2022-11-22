@@ -24,6 +24,7 @@ var xlsxData = [{
 } ];
 
 PlayXlsx.generateNew(xlsxData).writeFile("test3.xlsx");
+PlayXlsx.generateFast(xlsxData[0].data).writeFile("test4.xlsx");
 ```
 
 **读取**

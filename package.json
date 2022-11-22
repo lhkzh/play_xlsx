@@ -1,6 +1,6 @@
 {
   "name": "play_xlsx",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": false,
   "main": "lib/index.js",
   "module": "lib/index.js",
@@ -14,5 +14,8 @@
     "@types/ltx_Element.d.ts",
     "@types/Xlsx_base.d.ts",
     "package.json"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "^15.12.0"
+  }
 }
