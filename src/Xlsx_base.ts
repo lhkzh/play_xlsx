@@ -1,7 +1,7 @@
 import LtxElement from "./ltx_Element";
 
 export abstract class Xlsx_base {
-    constructor(protected _fe: any = {}, protected _ss: any = {}) {
+    constructor(protected _fe: { [index: string]: LtxElement } = {}, protected _ss: { [index: string]: string } = {}) {
     }
     protected _loadData(data: Buffer): Xlsx_base {
         return this;
@@ -22,7 +22,7 @@ export abstract class Xlsx_base {
         }
     }
     public readAll(withOutHidden: boolean = true) {
-        var result: Array<{ i: number, name: string, data: Array<string | number | boolean> }> = [];
+        var result: Array<{ i: number, name: string, data: Array<Array<Xlsx_Val>> }> = [];
         this._fe['xl/workbook.xml'].getChild('sheets').children.forEach((e, i) => {
             if (e.attrs['state'] != "visible" && withOutHidden) {
                 return;
@@ -49,7 +49,7 @@ export abstract class Xlsx_base {
         });
     }
     public getSheetByIndex(i: number) {
-        var el = this._fe['xl/worksheets/sheet' + (i + 1) + '.xml'];
+        var el = this._fe[this._link_xml(i)];//this._fe['xl/worksheets/sheet' + (i + 1) + '.xml'];
         if (!el) return null;
         return new Xlsx_sheet(el, this._ss);
     }
@@ -66,41 +66,100 @@ export abstract class Xlsx_base {
     }
     public isSheetVisible(sheetIndex: number) {
         var e = this._fe['xl/workbook.xml'].getChild('sheets').children[sheetIndex];
-        return e && e.attrs['state'] == "visible";
+        return e && e.attrs['state'] != "hidden";
     }
+
     public copySheet(i: number, name: string) {
         if (i > 0 && i < this.sheetNum - 1) {
             return false;
         }
-        var n = this.sheetNum + 1;
-        this._fe['[Content_Types].xml'].c('Override', { PartName: '/xl/worksheets/sheet' + n + '.xml', ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml' });
-        this._fe['xl/workbook.xml'].getChild('sheets').c('sheet', { name: name, sheetId: n, state: 'visible', 'r:id': 'sheetrId' + n });
-        this._fe['xl/_rels/workbook.xml.rels'].c('Relationship', { Id: 'sheetrId' + n, Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet', Target: 'worksheets/sheet' + n + '.xml' });
-        this._fe['xl/worksheets/sheet' + n + '.xml'] = this._fe['xl/worksheets/sheet' + (i + 1) + '.xml'].clone();
-        var srcRels = this._fe['xl/worksheets/_rels/sheet' + (i + 1) + '.xml.rels'];
-        if (srcRels) this._fe['xl/worksheets/_rels/sheet' + n + '.xml.rels'] = srcRels.clone();
+        let srcXml = this._link_xml(i);
+        if (!srcXml || !this._fe[srcXml]) {
+            return false;
+        }
+        let nTo = this._next_id_n();//this.sheetNum + 1;
+        this._fe['[Content_Types].xml'].c('Override', { PartName: '/xl/worksheets/sheet' + nTo + '.xml', ContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml' });
+        this._fe['xl/workbook.xml'].getChild('sheets').c('sheet', { name: name, sheetId: nTo, state: 'visible', 'r:id': 'sId' + nTo });
+        this._fe['xl/_rels/workbook.xml.rels'].c('Relationship', { Id: 'sId' + nTo, Type: 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet', Target: 'worksheets/sheet' + nTo + '.xml' });
+        this._fe['xl/worksheets/sheet' + nTo + '.xml'] = this._fe[srcXml].clone();
+        let src_refs = srcXml.replace("worksheets/", "worksheets/_rels/")
+        if (this._fe[src_refs]) this._fe['xl/worksheets/_rels/sheet' + nTo + '.xml.rels'] = this._fe[src_refs].clone();
         return true;
     }
-
+    private _next_id_n() {
+        let ens: number[] = [];
+        this._fe['xl/_rels/workbook.xml.rels'].getChildren("Relationship").forEach(e => {
+            var t = e.attr("Target");
+            if (t && t.startsWith("worksheets/sheet")) {
+                ens.push(parseInt((e.attr("Target") + "").replace(/\D/g, "")));
+            }
+        });
+        if (ens.length < 1) {
+            return this.sheetNum + 1;
+        }
+        ens = ens.sort();
+        return ens[ens.length - 1] + 1;
+    }
+    private _link_xml(i: number) {
+        let rid: string = this._fe['xl/workbook.xml'].getChild('sheets').children[i].attr("r:id");
+        let rem = this._fe['xl/_rels/workbook.xml.rels'].getChildren("Relationship").find(e => e.attr("Id") == rid);
+        return rem ? "xl/" + rem.attr("Target") : null;
+    }
+    /**
+     * 删除sheet
+     * @param i 索引 或 名字
+     */
+    public removeSheet(i: number | string) {
+        let tmpNames = this.sheetNames;
+        let j = typeof (i) == "string" ? tmpNames.indexOf(i.toString()) : <number>i;
+        if (j < 0 || j >= tmpNames.length) {
+            return false;
+        }
+        let Jname = tmpNames[j];
+        let Jid = j + 1;
+        if (tmpNames.length == 1) {
+            this.getSheetByIndex(0).empty();
+        } else {
+            let CT_em = this._fe['[Content_Types].xml'].getChildren("Override").find(e => {
+                var pname: string = e.attr("PartName");
+                if (pname.startsWith("/xl/worksheets/sheet") && pname.endsWith(".xml")) {
+                    return parseInt(pname.replace(/\D/g, "")) == Jid
+                }
+                return false;
+            });
+            if (CT_em) {
+                this._fe['[Content_Types].xml'].remove(CT_em);
+            }
+            let WS_em = this._fe['xl/workbook.xml'].getChild('sheets').children.find(e => {
+                if (e.attr("name") == Jname) {
+                    return true;
+                }
+                return false;
+            });
+            if (WS_em) {
+                let WS_em_rid: string = WS_em.attr("r:id");
+                this._fe['xl/workbook.xml'].getChild('sheets').remove(WS_em);
+                let WS_em_releation = this._fe['xl/_rels/workbook.xml.rels'].getChildren("Relationship").find(e => e.attr("Id") == WS_em_rid);
+                if (WS_em_releation) {
+                    this._fe['xl/_rels/workbook.xml.rels'].remove(WS_em_releation);
+                }
+            }
+            delete this._fe["xl/worksheets/sheet" + Jid + ".xml"];
+            delete this._fe['xl/worksheets/_rels/sheet' + Jid + '.xml.rels'];
+        }
+    }
+    public swapSheetByIndex(index1: number, index2: number) {
+        var array = this._fe['xl/workbook.xml'].getChild('sheets').children;
+        [array[index1], array[index2]] = [array[index2], array[index1]];
+    }
     protected writeAll(sheets: Array<{ name: string, data: any[] }>) {
         var end = sheets.length - 1;
-        for (var i = 0; i < sheets.length; i++) {
+        for (let i = 0; i < sheets.length; i++) {
             if (i < end) {
                 this.copySheet(i, "tmp");
             }
             this.setSheetName(i, sheets[i].name);
-            var xss = this.getSheetByIndex(i);
-            var xdata = sheets[i].data;
-            var max_row = xdata.length;
-            var max_col = 1;
-            for (var j = 0; j < xdata.length; j++) {
-                xss.write("A" + (j + 1), xdata[j]);
-                if (Array.isArray(xdata[j])) {
-                    max_col = Math.max(xdata[j].length, max_col);
-                }
-            }
-            var ref = "A1:" + (to_26_str(max_col)) + max_row;
-            xss._writeDimension(ref);
+            this.getSheetByIndex(i).writeAll(sheets[i].data);
         }
         return this;
     }
@@ -119,24 +178,15 @@ export abstract class Xlsx_base {
     }
 }
 
-const D26 = 'ZABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-function to_26_str(num: number) {
-    let res = [];
-    // 短除法，注意余数为0时，将商减1，对应字母'z'
-    while (num > 26) {
-        res.push(D26[num % 26]);
-        num = Math.floor(num / 26);
-    }
-    // 不要忘了末位
-    res.push(D26[num]);
-    // 倒置
-    return res.reverse().join('');
-}
-
 export class Xlsx_sheet {
     constructor(private _el: LtxElement, private _ss: any = {}) {
     }
-    public read(ref: string) {
+    /**
+     * 读取ref范围的数据
+     * @param ref "A1" or "A1:B3"
+     * @returns 
+     */
+    public read(ref: string = this.dimension()): Xlsx_Val | Array<Xlsx_Val> | Array<Array<Xlsx_Val>> {
         var splt = ref.split(":");
         if (1 == splt.length) {
             return this._readCell(ref);
@@ -144,9 +194,39 @@ export class Xlsx_sheet {
             return this._readRange(ref);
         }
     }
-    public readAll(): Array<string | number | boolean> {
-        return <any[]>this.read(this.dimension());
+    /**
+     * 覆盖式写入数据
+     * @param xdata 
+     */
+    public writeAll(xdata: any[]) {
+        this.empty();
+        let max_row = xdata.length;
+        let max_col = 1;
+        for (let j = 0; j < xdata.length; j++) {
+            this.write("A" + (j + 1), xdata[j]);
+            if (Array.isArray(xdata[j])) {
+                max_col = Math.max(xdata[j].length, max_col);
+            }
+        }
+        let ref = "A1:" + (encode_col(max_col - 1)) + max_row;
+        this._writeDimension(ref);
     }
+    /**
+     * 读取本sheet内数据
+     */
+    public readAll(): Array<Array<Xlsx_Val>> {
+        let r: any = this.read();
+        if (!Array.isArray(r)) {
+            r = [[r]];
+        } else if (!Array.isArray(r[0])) {
+            r = [r];
+        }
+        return r;
+    }
+    /**
+     * 数据标记范围
+     * @returns A1 OR A1:B3
+     */
     public dimension(): string {
         var em = this._get_dimension();
         var ref: string;
@@ -170,28 +250,25 @@ export class Xlsx_sheet {
         }
         return null;
     }
-    _readRange(range) {
-        range = decode_range(range);
+    _readRange(range: string) {
+        const ref = decode_range(range);
 
-        if (range.s.r == range.e.r) {
-            return this._readRow(range.s.r, range.s.c, range.e.c);
-        } else if (range.s.c == range.e.c) {
-            return this._readCol(range.s.c, range.s.r, range.e.r);
+        if (ref.s.r == ref.e.r) {
+            return this._readRow(ref.s.r, ref.s.c, ref.e.c);
+        } else if (ref.s.c == ref.e.c) {
+            return this._readCol(ref.s.c, ref.s.r, ref.e.r);
         } else {
             var ret = [];
-            for (var r = range.s.r; r <= range.e.r; r++) {
-                var row = this._readRow(r, range.s.c, range.e.c);
-                ret.push(row);
+            for (var r = ref.s.r; r <= ref.e.r; r++) {
+                ret.push(this._readRow(r, ref.s.c, ref.e.c));
             }
             return ret;
         }
     }
-    _readRow(r, sc, ec) {
-        var row = this._el.getChild('sheetData').getChildByAttr('r', '' + r);
-        sc = decode_col(sc);
-        ec = decode_col(ec);
-        var ret = [];
-        for (var i = sc; i <= ec; i++) {
+    _readRow(r: number, sc: string, ec: string) {
+        let row = this._el.getChild('sheetData').getChildByAttr('r', '' + r),
+            ret: Xlsx_Val[] = [];
+        for (var i = decode_col(sc); i <= decode_col(ec); i++) {
             if (row) {
                 var cell = row.getChildByAttr('r', encode_col(i) + r);
                 ret.push(this._cellv(cell));
@@ -201,27 +278,27 @@ export class Xlsx_sheet {
         }
         return ret;
     }
-    _readCol(c, sr, er) {
-        var ret = [];
-        var sd = this._el.getChild('sheetData');
+    _readCol(c: string, sr: number, er: number) {
+        var ret: Xlsx_Val[] = [],
+            sd = this._el.getChild('sheetData');
         for (var i = sr; i <= er; i++) {
-            var row = sd.getChildByAttr('r', '' + i);
+            var row = sd.getChildByAttr('r', i.toString());
             var cell = row.getChildByAttr('r', c + i);
             ret.push(this._cellv(cell));
         }
         return ret;
     }
-    _readCell(cell) {
+    _readCell(cell: string): Xlsx_Val {
         var cr = split_cell(cell);
-        var r = this._el.getChild('sheetData').getChildByAttr('r', '' + cr[1]);
-        var v = '';
+        var r: LtxElement = this._el.getChild('sheetData').getChildByAttr('r', '' + cr[1]);
+        var v: Xlsx_Val = '';
         if (r) {
             var c = r.getChildByAttr('r', cell);
             v = this._cellv(c);
         }
         return v;
     }
-    _cellv(c) {
+    _cellv(c: LtxElement): Xlsx_Val {
         if (!c) return '';
         var v: any = '';
         var t = c.attrs['t'];
@@ -239,14 +316,22 @@ export class Xlsx_sheet {
         }
         return v;
     }
-    public write(cell, v, append?: boolean) {
+    /**
+     * 清空本sheet的数据
+     */
+    public empty() {
+        this._writeDimension("A1");
+        (this._el.getChild('sheetData') as LtxElement).children = [];
+    }
+    write(cell: string, v: any, append?: boolean) {
         var self = this;
         var cr = split_cell(cell);
+        var cr1n = parseInt(cr[1]);
         if (Array.isArray(v)) {
-            var sr = cr[1]; // 开始行
+            var sr = cr1n; // 开始行
             var sc = decode_col(cr[0]); // 开始列 int
             if (append) {
-                self._writeRow(sr, sc, v);
+                self._writeRow(cr[1], sc, v);
             } else {
                 v.forEach(function (r) {
                     if (Array.isArray(r)) {
@@ -261,10 +346,10 @@ export class Xlsx_sheet {
                 });
             }
         } else {
-            self._writeCell(cr[1], cr[0], v);
+            self._writeCell(cr1n, cr[0], v);
         }
     }
-    _v2cell(v) {
+    _v2cell(v: Xlsx_Val) {
         var cv = {
             v: v,
             s: 0,
@@ -279,17 +364,17 @@ export class Xlsx_sheet {
         }
         return cv;
     }
-    _writeCell(ri, c, v) {
-        var sd = this._el.getChild('sheetData');
-        var r = sd.getChildByAttr('r', '' + ri);
-        var cr = '' + c + ri;
-        var cv = this._v2cell(v);
+    _writeCell(ri: number, c: string, v: Xlsx_Val) {
+        let sd = this._el.getChild('sheetData');
+        let r = sd.getChildByAttr('r', ri.toString());
+        let cr = (c + ri).toString();
+        let cv = this._v2cell(v);
         if (r) {
-            var c = r.getChildByAttr('r', cr);
-            if (c) {
-                c.attr('t', cv.t);
-                var rcv = c.getChild('v');
-                rcv ? rcv.text(cv.v) : c.c('v').t(cv.v);
+            let ce = r.getChildByAttr('r', cr);
+            if (ce) {
+                ce.attr('t', cv.t);
+                let rcv = ce.getChild('v');
+                rcv ? rcv.text(cv.v) : ce.c('v').t(cv.v);
             } else {
                 r.c('c', {
                     r: cr,
@@ -299,7 +384,7 @@ export class Xlsx_sheet {
             }
         } else {
             sd.c('row', {
-                r: '' + ri
+                r: ri.toString()
             }).c('c', {
                 r: cr,
                 s: cv.s,
@@ -307,9 +392,9 @@ export class Xlsx_sheet {
             }).c('v').t(cv.v);
         }
     }
-    _writeRow(sr, sc, rows) {
-        sr = parseInt(sr);
-        var sd = this._el.getChild('sheetData');
+    _writeRow(sr_: string, sc: number, rows: any[]) {
+        var sr = parseInt(sr_);
+        var sd: LtxElement = this._el.getChild('sheetData');
         var srow = sd.c('row', { r: '' + sr });
         var self = this;
         rows.forEach(function (r, ri) {
@@ -339,27 +424,29 @@ export class Xlsx_sheet {
     }
 }
 
-function decode_col(colstr) {
+export type Xlsx_Val = string | number | boolean;
+
+function decode_col(colstr: string) {
     var c = colstr.replace(/^\$([A-Z])/, "$1"), d = 0, i = 0;
     for (; i !== c.length; ++i)
         d = 26 * d + c.charCodeAt(i) - 64;
     return d - 1;
-};
+}
 
-function encode_col(col) {
+function encode_col(col: number) {
     var s = "";
     for (++col; col; col = Math.floor((col - 1) / 26))
         s = String.fromCharCode(((col - 1) % 26) + 65) + s;
     return s;
-};
+}
 
-function split_cell(cstr) {
+function split_cell(cstr: string): string[] {
     return cstr.replace(/(\$?[A-Z]*)(\$?\d*)/, "$1,$2").split(",");
-};
+}
 
-function decode_range(range) {
-    var x = range.split(":").map(function (cell) {
-        var splt = split_cell(cell);
+function decode_range(range: string): { s: { c: string, r: number }, e: { c: string, r: number } } {
+    let x = range.split(":").map(function (cell) {
+        let splt = split_cell(cell);
         return {
             c: splt[0],
             r: parseInt(splt[1])

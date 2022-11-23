@@ -1,6 +1,6 @@
 {
   "name": "play_xlsx",
-  "version": "0.0.5",
+  "version": "0.0.7",
   "private": false,
   "main": "lib/index.js",
   "module": "lib/index.js",

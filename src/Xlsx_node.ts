@@ -69,11 +69,7 @@ export class Xlsx_node extends Xlsx_base {
         Object.keys(self._fe).forEach(f => {
             var zen = new (require("./ZipFile").ZipEntry)();
             zen.fileName = f;
-            if (typeof self._fe[f] == "string") {
-                zen.data = Buffer.from(self._fe[f]);
-            } else {
-                zen.data = Buffer.from(self._fe[f].root().toString());
-            }
+            typeof self._fe[f] == "string" ? zen.data = Buffer.from(self._fe[f].toString()) : zen.data = Buffer.from(self._fe[f].root().toString());
             zfile.addEntry(zen);
         });
         return zfile.compress();

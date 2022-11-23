@@ -30,10 +30,38 @@ PlayXlsx.generateFast(xlsxData[0].data).writeFile("test4.xlsx");
 **读取**
 ```
 const PlayXlsx=require("play_xlsx").PlayXlsx;
-var xls = PlayXlsx.loadByFile("test3.xlsx");
-console.log(xls.sheetsNum, xls.sheetsNames, xls.isSheetVisible(0))
-var sheet = xls.getSheetByIndex(0);
-console.log(sheet.dimension(), JSON.stringify(sheet.readAll()))
+var book = PlayXlsx.loadByFile("test3.xlsx");
+console.log(book.sheetsNum, book.sheetsNames, book.isSheetVisible(0));
+var sheet = book.getSheetByIndex(0);
+console.log(sheet.dimension(), JSON.stringify(sheet.readAll()));
+console.log(sheet.dimension(), JSON.stringify(sheet.read()));
+```
+
+**一些操作**
+```
+//获取有几个sheet
+book.sheetNum
+//获取所有sheet的名字
+book.sheetNames
+//交换sheet顺序
+book.swapSheetByIndex 
+//根据索引或名字,删除sheet
+book.removeSheet 
+//修改sheet名字
+book.setSheetName
+//通过索引获取sheet
+book.getSheetByIndex
+//通过name获取sheet
+book.getSheetByName
+//写入文件
+book.writeFile
+
+//写入数据
+sheet.writeAll()
+//标准化读取所有
+sheet.readAll()
+//根据参数不同随缘返回
+sheet.read()
 ```
        
 xlsx改自 https://github.com/lodengo/xlsx   

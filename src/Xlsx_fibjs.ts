@@ -38,7 +38,7 @@ export class Xlsx_fibjs extends Xlsx_base {
         var zfile = require("zip").open(ms, "w");
         var self = this;
         Object.keys(self._fe).forEach(function (f) {
-            typeof self._fe[f] == 'string' ? zfile.write(Buffer.from(self._fe[f]), f) : zfile.write(Buffer.from(self._fe[f].root().toString()), f);
+            typeof self._fe[f] == 'string' ? zfile.write(Buffer.from(self._fe[f].toString()), f) : zfile.write(Buffer.from(self._fe[f].root().toString()), f);
         });
         zfile.close();
         ms.rewind();
